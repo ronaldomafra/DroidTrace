@@ -13,6 +13,7 @@ from logcat_manager.commands import Command, CommandError, parse_command
         (":level all", "level", ("all",)),
         (":tag Network", "tag", ("Network",)),
         (":pid 123", "pid", (123,)),
+        ("/package br.com.tbs.afv.multiplatform", "package", ("br.com.tbs.afv.multiplatform",)),
         (":find fatal exception", "find", ("fatal exception",)),
         (":regex timeout.*", "regex", ("timeout.*",)),
         (":pause", "pause", ()),

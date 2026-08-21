@@ -37,6 +37,7 @@ class LogFilters:
     min_level: str | None = None
     tag_query: str | None = None
     pid: int | None = None
+    pids: frozenset[int] | None = None
     search_query: str | None = None
     regex_pattern: str | None = None
     _regex: re.Pattern[str] | None = field(init=False, default=None, repr=False)
@@ -72,6 +73,8 @@ class LogFilters:
         if self.tag_query and self.tag_query.casefold() not in (entry.tag or "").casefold():
             return False
         if self.pid is not None and entry.pid != self.pid:
+            return False
+        if self.pids is not None and entry.pid not in self.pids:
             return False
         if self.search_query and self.search_query.casefold() not in entry.message.casefold():
             return False

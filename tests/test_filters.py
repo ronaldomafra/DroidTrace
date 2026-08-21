@@ -36,6 +36,22 @@ def test_invalid_regex_returns_error_without_replacing_previous_regex():
     assert [item.message for item in filters.apply([entry(message="timeout")])] == ["timeout"]
 
 
+
+
+def test_package_pid_set_matches_every_process_of_the_package():
+    from logcat_manager.filters import LogFilters
+    from logcat_manager.models import LogEntry
+
+    filters = LogFilters(pids=frozenset({101, 202}))
+    entries = [
+        LogEntry(raw="one", pid=101, message="main"),
+        LogEntry(raw="two", pid=202, message="worker"),
+        LogEntry(raw="three", pid=303, message="other"),
+    ]
+
+    assert [entry.message for entry in filters.apply(entries)] == ["main", "worker"]
+
+
 def test_regex_filter_limits_entries():
     filters = LogFilters(regex_pattern=r"error \d+")
 

@@ -23,6 +23,8 @@ def parse_command(text: str) -> Command:
     text = text.strip()
     if not text:
         raise CommandError("command cannot be empty")
+    if text.startswith("/"):
+        text = ":" + text[1:]
     if not text.startswith(":"):
         return Command("find", (text,))
 
@@ -58,6 +60,9 @@ def parse_command(text: str) -> Command:
                 raise CommandError("pid must be a number or clear") from error
         value = " ".join(arguments) if name in {"find", "regex"} else arguments[0]
         return Command(name, (value,))
+    if name == "package":
+        _require_count(name, arguments, 1)
+        return Command(name, (arguments[0],))
     if name == "device":
         _require_count(name, arguments, 1)
         return Command(name, (arguments[0],))

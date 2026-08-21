@@ -49,6 +49,16 @@ class AdbClient:
                 devices.append(AdbDevice(serial, state.strip()))
         return devices
 
+    def package_pids(self, package_name: str) -> list[int]:
+        result = subprocess.run(
+            self.command("shell", "pidof", package_name),
+            capture_output=True,
+            text=True,
+            shell=False,
+            check=True,
+        )
+        return [int(pid) for pid in result.stdout.split()]
+
     def clear_logs(self) -> None:
         subprocess.run(
             self.command("logcat", "-c"), capture_output=True, text=True, shell=False, check=True

@@ -10,6 +10,7 @@ class FakeStream:
         self.events: Queue[str] = Queue()
         self.started = False
         self.stopped = False
+        self.client = type("FakeClient", (), {"package_pids": lambda _self, _package: [1234, 5678]})()
 
     def start(self) -> None:
         self.started = True
@@ -47,6 +48,10 @@ async def test_slash_command_menu_is_visible_and_clickable():
     async with app.run_test() as pilot:
         menu = app.query_one("#command-menu", OptionList)
         command_input = app.query_one("#command-input", Input)
+        assert menu.display is False
+        command_input.value = "/"
+        await pilot.pause()
+        assert menu.display is True
         assert menu.option_count >= 5
 
         command_input.value = "/level E"
@@ -55,6 +60,23 @@ async def test_slash_command_menu_is_visible_and_clickable():
 
         assert app.filters.min_level == "E"
         assert command_input.has_focus
+
+
+@pytest.mark.asyncio
+async def test_package_command_resolves_all_package_processes():
+    from textual.widgets import Input
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    async with app.run_test() as pilot:
+        command_input = app.query_one("#command-input", Input)
+        command_input.value = "/package br.com.tbs.afv.multiplatform"
+        await pilot.pause()
+        await pilot.press("enter")
+
+        assert app.filters.pids == frozenset({1234, 5678})
+        assert app.package_name == "br.com.tbs.afv.multiplatform"
 
 
 @pytest.mark.asyncio

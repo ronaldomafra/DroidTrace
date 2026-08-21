@@ -101,8 +101,26 @@ def test_clear_logs_invokes_adb_logcat_clear_without_shell(monkeypatch):
     assert calls == [(["adb", "-s", "ABC", "logcat", "-c"], {"capture_output": True, "text": True, "shell": False, "check": True})]
 
 
+
+
 def test_validate_executable_reports_missing_command(monkeypatch):
     monkeypatch.setattr("logcat_manager.adb.shutil.which", lambda _: None)
 
     with pytest.raises(FileNotFoundError):
         AdbClient("missing-adb").validate_executable()
+
+
+def test_package_pids_uses_adb_pidof_for_selected_device(monkeypatch):
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(stdout="1234 5678\n")
+
+    monkeypatch.setattr("logcat_manager.adb.subprocess.run", fake_run)
+
+    assert AdbClient("adb", serial="ABC").package_pids("br.com.tbs.afv.multiplatform") == [1234, 5678]
+    assert calls == [
+        (["adb", "-s", "ABC", "shell", "pidof", "br.com.tbs.afv.multiplatform"],
+         {"capture_output": True, "text": True, "shell": False, "check": True})
+    ]

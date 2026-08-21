@@ -25,6 +25,7 @@ class LogcatApp(App[None]):
         ("level E", "Nível", "Exibe E e F; use /level all para remover"),
         ("tag Activity", "Tag", "Filtra uma tag do log"),
         ("pid 1234", "PID", "Filtra um processo pelo PID"),
+        ("package br.com.exemplo.app", "Package", "Localiza automaticamente os PIDs do app"),
         ("find timeout", "Buscar", "Busca texto na mensagem"),
         ("regex FATAL.*Exception", "Regex", "Busca com expressão regular"),
         ("pause", "Pausar", "Para somente a atualização visual"),
@@ -60,6 +61,7 @@ class LogcatApp(App[None]):
         self.auto_start = auto_start
         self.buffer = LogBuffer(self.config.max_buffer_lines)
         self.filters = LogFilters()
+        self.package_name: str | None = None
         self.paused = False
         self.following = True
         self.command_history: list[str] = []
@@ -75,11 +77,12 @@ class LogcatApp(App[None]):
 
     def _command_options(self, query: str = "") -> list[Option]:
         normalized = query.removeprefix("/").removeprefix(":").casefold().strip()
+        command_prefix = normalized.split(maxsplit=1)[0] if normalized else ""
         matches = [
             (command, label, description)
             for command, label, description in self.COMMANDS
             if not normalized
-            or normalized in command.casefold()
+            or command_prefix in command.casefold()
             or normalized in label.casefold()
             or normalized in description.casefold()
         ]
@@ -105,6 +108,7 @@ class LogcatApp(App[None]):
 
     def on_mount(self) -> None:
         self.query_one("#command-input", Input).focus()
+        self.query_one("#command-menu", OptionList).display = False
         if self.stream is None and self.auto_start:
             try:
                 from .adb import AdbLogcatStream
@@ -170,6 +174,8 @@ class LogcatApp(App[None]):
             active.append(f"tag={self.filters.tag_query}")
         if self.filters.pid is not None:
             active.append(f"pid={self.filters.pid}")
+        if self.package_name:
+            active.append(f"package={self.package_name}")
         if self.filters.search_query:
             active.append(f"find={self.filters.search_query}")
         if self.filters.regex_pattern:
@@ -203,9 +209,34 @@ class LogcatApp(App[None]):
         elif name == "pid":
             try:
                 self.filters.pid = None if argument.lower() == "clear" else int(argument)
+                self.filters.pids = None
+                self.package_name = None
             except ValueError:
                 self.notify("PID deve ser um número ou clear", severity="error")
                 return
+        elif name == "package":
+            if argument.lower() == "clear":
+                self.filters.pids = None
+                self.package_name = None
+            elif not argument:
+                self.notify("Use /package br.com.exemplo.app", severity="error")
+                return
+            elif self.stream is None or not hasattr(self.stream, "client"):
+                self.notify("ADB não está disponível para localizar o package", severity="error")
+                return
+            else:
+                try:
+                    pids = self.stream.client.package_pids(argument)
+                except Exception as error:
+                    self.notify(f"Falha ao localizar package: {error}", severity="error")
+                    return
+                if not pids:
+                    self.notify(f"Package não está em execução: {argument}", severity="warning")
+                    return
+                self.filters.pid = None
+                self.filters.pids = frozenset(pids)
+                self.package_name = argument
+                self.notify(f"Package {argument}: PID(s) {', '.join(map(str, pids))}")
         elif name == "find":
             self.filters.search_query = None if argument.lower() == "clear" else argument or None
         elif name == "regex":
