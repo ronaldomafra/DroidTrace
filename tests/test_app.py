@@ -38,6 +38,26 @@ async def test_prompt_remains_focused_after_filter_command():
 
 
 @pytest.mark.asyncio
+async def test_slash_command_menu_is_visible_and_clickable():
+    from textual.widgets import Input, OptionList
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    async with app.run_test() as pilot:
+        menu = app.query_one("#command-menu", OptionList)
+        command_input = app.query_one("#command-input", Input)
+        assert menu.option_count >= 5
+
+        command_input.value = "/level E"
+        await pilot.pause()
+        await pilot.press("enter")
+
+        assert app.filters.min_level == "E"
+        assert command_input.has_focus
+
+
+@pytest.mark.asyncio
 async def test_local_clear_requires_confirm():
     from logcat_manager.app import LogcatApp
 

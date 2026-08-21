@@ -108,9 +108,19 @@ A tela possui:
 - barra de status com quantidade de linhas e filtros ativos;
 - campo de comando sempre ativo no rodapé.
 
-Digite texto comum sem `:` para fazer uma busca rápida. Por exemplo, `timeout` equivale a `:find timeout`.
+O campo inferior fica sempre ativo. Digite `/` para abrir/filtrar o menu de comandos; clique em uma opção para preencher o prompt e ajuste os argumentos antes de pressionar `Enter`. Texto sem `/` ou `:` é uma busca rápida.
 
-### Filtros e pesquisa
+Os comandos antigos com `:` continuam compatíveis, mas o formato recomendado é com `/`:
+
+```text
+/level E
+/tag Activity
+/find timeout
+```
+
+### Menu de comandos
+
+O menu explica cada ação e pode ser filtrado enquanto você digita, por exemplo `/reg` mostra o comando de regex. Opções de risco, como limpar logs, nunca inserem `confirm` automaticamente: digite a confirmação explicitamente.
 
 | Comando | Descrição |
 |---|---|

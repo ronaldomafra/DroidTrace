@@ -7,7 +7,8 @@ from typing import Any
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
+from textual.widgets.option_list import Option
 
 from .config import AppConfig, save_config
 from .filters import LogBuffer, LogFilters
@@ -19,10 +20,27 @@ class LogcatApp(App[None]):
 
     MAX_LINES_PER_TICK = 200
     MAX_RENDERED_LINES = 2_000
+    COMMANDS = (
+        ("help", "Ajuda", "Mostra esta lista de comandos"),
+        ("level E", "Nível", "Exibe E e F; use /level all para remover"),
+        ("tag Activity", "Tag", "Filtra uma tag do log"),
+        ("pid 1234", "PID", "Filtra um processo pelo PID"),
+        ("find timeout", "Buscar", "Busca texto na mensagem"),
+        ("regex FATAL.*Exception", "Regex", "Busca com expressão regular"),
+        ("pause", "Pausar", "Para somente a atualização visual"),
+        ("resume", "Continuar", "Retoma a atualização visual"),
+        ("follow", "Ir ao fim", "Segue as linhas mais recentes"),
+        ("save", "Exportar", "Digite /save C:/logs/logcat.txt"),
+        ("clear", "Limpar tela", "Exige /clear confirm"),
+        ("adb-clear", "Limpar ADB", "Exige /adb-clear confirm"),
+        ("restart", "Reiniciar", "Reinicia a captura ADB"),
+        ("quit", "Sair", "Fecha o aplicativo"),
+    )
 
     CSS = """
     #log-view { height: 1fr; border: round $primary; }
     #status { height: 1; background: $panel; color: $text; }
+    #command-menu { height: 8; border: round $accent; }
     #command-input { dock: bottom; }
     """
     BINDINGS = [("ctrl+c", "quit", "Quit"), ("q", "quit", "Quit"), ("end", "follow", "Follow")]
@@ -51,8 +69,39 @@ class LogcatApp(App[None]):
         with Vertical():
             yield RichLog(id="log-view", highlight=True, markup=True, wrap=True)
             yield Static(id="status")
-            yield Input(placeholder="Digite :help para comandos ou texto para pesquisar", id="command-input")
+            yield OptionList(*self._command_options(), id="command-menu", compact=True)
+            yield Input(placeholder="Digite / para comandos ou texto para pesquisar", id="command-input")
         yield Footer()
+
+    def _command_options(self, query: str = "") -> list[Option]:
+        normalized = query.removeprefix("/").removeprefix(":").casefold().strip()
+        matches = [
+            (command, label, description)
+            for command, label, description in self.COMMANDS
+            if not normalized
+            or normalized in command.casefold()
+            or normalized in label.casefold()
+            or normalized in description.casefold()
+        ]
+        return [
+            Option(f"[bold cyan]/{command}[/]  [bold]{label}[/] — {description}", id=command)
+            for command, label, description in matches
+        ]
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        menu = self.query_one("#command-menu", OptionList)
+        if event.value.startswith(("/", ":")) or not event.value:
+            menu.display = True
+            menu.set_options(self._command_options(event.value))
+        else:
+            menu.display = False
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_id is None:
+            return
+        command_input = self.query_one("#command-input", Input)
+        command_input.value = f"/{event.option_id}"
+        command_input.focus()
 
     def on_mount(self) -> None:
         self.query_one("#command-input", Input).focus()
@@ -139,6 +188,8 @@ class LogcatApp(App[None]):
         event.input.focus()
 
     def _execute(self, text: str) -> None:
+        if text.startswith("/"):
+            text = ":" + text[1:]
         if not text.startswith(":"):
             self.filters.search_query = text or None
             self._render_logs()
