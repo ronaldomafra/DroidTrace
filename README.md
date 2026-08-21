@@ -102,6 +102,8 @@ Exemplo para manter até 50 mil linhas:
 A tela possui:
 
 - área principal rolável com os logs;
+- buffer local circular de até 10.000 linhas por padrão (ajustável com `--max-buffer-lines`);
+- janela visual limitada às 2.000 linhas filtradas mais recentes para manter o terminal responsivo;
 - cores por prioridade (`V`, `D`, `I`, `W`, `E` e `F`);
 - barra de status com quantidade de linhas e filtros ativos;
 - campo de comando sempre ativo no rodapé.

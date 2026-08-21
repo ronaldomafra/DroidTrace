@@ -18,6 +18,7 @@ class LogcatApp(App[None]):
     """Interactive terminal interface for a local ADB logcat stream."""
 
     MAX_LINES_PER_TICK = 200
+    MAX_RENDERED_LINES = 2_000
 
     CSS = """
     #log-view { height: 1fr; border: round $primary; }
@@ -95,10 +96,14 @@ class LogcatApp(App[None]):
         if not self.paused and self._screen_stack:
             self._render_logs()
 
+    def entries_for_render(self) -> list[Any]:
+        """Return the newest filtered entries that fit the responsive view."""
+        return self.filters.apply(self.buffer)[-self.MAX_RENDERED_LINES :]
+
     def _render_logs(self) -> None:
         log = self.query_one("#log-view", RichLog)
         log.clear()
-        visible = self.filters.apply(self.buffer)
+        visible = self.entries_for_render()
         for entry in visible:
             log.write(Text(entry.raw, style=style_for_priority(entry.priority)))
         if self.following:

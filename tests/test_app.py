@@ -73,3 +73,17 @@ def test_drain_processes_only_one_bounded_batch_per_tick():
 
     assert len(app.buffer) == app.MAX_LINES_PER_TICK
     assert stream.events.qsize() == 500 - app.MAX_LINES_PER_TICK
+
+
+def test_render_window_is_bounded_to_keep_large_buffers_responsive():
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    for number in range(10_000):
+        app.add_log_line(f"08-21 10:12:13.123  1234  5678 I Test: log {number}")
+
+    entries = app.entries_for_render()
+
+    assert len(entries) == app.MAX_RENDERED_LINES
+    assert entries[0].message == f"log {10_000 - app.MAX_RENDERED_LINES}"
+    assert entries[-1].message == "log 9999"
