@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from queue import Empty
 from typing import Any
 
 from rich.text import Text
@@ -15,6 +16,8 @@ from .parser import parse_log_line, style_for_priority
 
 class LogcatApp(App[None]):
     """Interactive terminal interface for a local ADB logcat stream."""
+
+    MAX_LINES_PER_TICK = 200
 
     CSS = """
     #log-view { height: 1fr; border: round $primary; }
@@ -76,8 +79,16 @@ class LogcatApp(App[None]):
         lines = getattr(self.stream, "lines", getattr(self.stream, "events", None))
         if lines is None:
             return
-        while not lines.empty():
-            self.add_log_line(lines.get_nowait())
+        processed = 0
+        while processed < self.MAX_LINES_PER_TICK:
+            try:
+                line = lines.get_nowait()
+            except Empty:
+                break
+            self.buffer.append(parse_log_line(line))
+            processed += 1
+        if processed and not self.paused and self._screen_stack:
+            self._render_logs()
 
     def add_log_line(self, line: str) -> None:
         self.buffer.append(parse_log_line(line))

@@ -59,3 +59,17 @@ async def test_rendering_a_log_line_does_not_raise():
     async with app.run_test():
         app.add_log_line("08-21 10:12:13.123  1234  5678 E MyTag: boom")
         assert len(app.buffer) == 1
+
+
+def test_drain_processes_only_one_bounded_batch_per_tick():
+    from logcat_manager.app import LogcatApp
+
+    stream = FakeStream()
+    for number in range(500):
+        stream.events.put(f"08-21 10:12:13.123  1234  5678 I Test: log {number}")
+    app = LogcatApp(stream=stream, auto_start=False)
+
+    app._drain_stream()
+
+    assert len(app.buffer) == app.MAX_LINES_PER_TICK
+    assert stream.events.qsize() == 500 - app.MAX_LINES_PER_TICK
