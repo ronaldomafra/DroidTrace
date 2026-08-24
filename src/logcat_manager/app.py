@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from queue import Empty
 from threading import Thread
@@ -13,10 +15,19 @@ from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
-from .analysis import CodexAnalyzer
+from .analysis import CodexAnalyzer, format_analysis
 from .config import AppConfig, save_config
 from .filters import LogBuffer, LogFilters
 from .parser import parse_log_line, style_for_priority
+
+
+@dataclass(frozen=True)
+class AnalysisRecord:
+    number: int
+    created_at: str
+    prompt: str
+    result: str
+    model: str | None
 
 
 class LogcatApp(App[None]):
@@ -33,6 +44,10 @@ class LogcatApp(App[None]):
         ("pid", "PID", "Uso: /pid 1234 ou /pid clear"),
         ("package", "Package", "Uso: /package br.com.exemplo.app"),
         ("analise", "Análise Codex", "Uso: /analise [foco opcional]"),
+        ("analises", "Histórico", "Mostra análises desta sessão"),
+        ("ver", "Abrir análise", "Uso: /ver número"),
+        ("logs", "Voltar aos logs", "Fecha análise ou histórico"),
+        ("model", "Modelo", "Uso: /model nome-do-modelo"),
         ("find", "Buscar", "Uso: /find timeout ou /find clear"),
         ("regex", "Regex", "Uso: /regex FATAL.*Exception"),
         ("pause", "Pausar", "Pausa a atualização visual"),
@@ -66,13 +81,16 @@ class LogcatApp(App[None]):
         self.config = config or AppConfig()
         self.config_path = config_path
         self.stream = stream
-        self.analyzer = analyzer or CodexAnalyzer()
+        self.analyzer = analyzer or CodexAnalyzer(model=self.config.codex_model)
         self.auto_start = auto_start
         self.buffer = LogBuffer(self.config.max_buffer_lines)
         self.filters = LogFilters()
         self.package_name: str | None = None
         self.showing_help = False
         self.analysis_text: str | None = None
+        self.analysis_history: list[AnalysisRecord] = []
+        self.current_analysis_number: int | None = None
+        self.showing_analysis_history = False
         self.analysis_running = False
         self.paused = False
         self.following = True
@@ -225,11 +243,30 @@ class LogcatApp(App[None]):
             for line in self.help_lines():
                 log.write(Text(line, style="bold cyan" if line.startswith("LOGCAT") else "white"))
             return
-        if self.analysis_text:
-            log.write(Text("ANÁLISE CODEX", style="bold magenta"))
+        if self.showing_analysis_history:
+            log.write(Text("HISTÓRICO DE ANÁLISES", style="bold magenta"))
+            if not self.analysis_history:
+                log.write("Nenhuma análise nesta sessão.")
+            for record in self.analysis_history:
+                focus = record.prompt or "análise padrão"
+                model = record.model or "padrão"
+                log.write(f"#{record.number}  {record.created_at}  [{model}]  {focus}")
             log.write("")
-            for line in self.analysis_text.splitlines():
-                log.write(Text(line, style="white"))
+            log.write("Use /ver N para abrir uma análise ou /logs para voltar.")
+            return
+        if self.analysis_text:
+            record = next((item for item in self.analysis_history if item.number == self.current_analysis_number), None)
+            heading = f"ANÁLISE CODEX #{record.number}" if record else "ANÁLISE CODEX"
+            log.write(Text(heading, style="bold magenta"))
+            if record:
+                log.write(f"{record.created_at}  |  modelo: {record.model or 'padrão'}")
+            log.write("")
+            for title, lines in format_analysis(self.analysis_text):
+                log.write(Text(title, style="bold cyan"))
+                for line in lines:
+                    log.write(Text(line, style="white"))
+                log.write("")
+            log.write("Use /logs para voltar ou /analises para o histórico.")
             return
         visible = self.entries_for_render()
         for entry in visible:
@@ -277,11 +314,11 @@ class LogcatApp(App[None]):
         try:
             result = self.analyzer.analyze(entries, user_prompt)
         except Exception as error:
-            self.call_from_thread(self._finish_analysis, None, str(error))
+            self.call_from_thread(self._finish_analysis, None, str(error), user_prompt)
         else:
-            self.call_from_thread(self._finish_analysis, result, None)
+            self.call_from_thread(self._finish_analysis, result, None, user_prompt)
 
-    def _finish_analysis(self, result: str | None, error: str | None) -> None:
+    def _finish_analysis(self, result: str | None, error: str | None, user_prompt: str) -> None:
         self.analysis_running = False
         if error:
             self.showing_help = False
@@ -289,7 +326,17 @@ class LogcatApp(App[None]):
             self._render_logs()
             return
         self.showing_help = False
+        self.showing_analysis_history = False
         self.analysis_text = result
+        record = AnalysisRecord(
+            number=len(self.analysis_history) + 1,
+            created_at=datetime.now().strftime("%H:%M:%S"),
+            prompt=user_prompt,
+            result=result or "",
+            model=getattr(self.analyzer, "model", self.config.codex_model),
+        )
+        self.analysis_history.append(record)
+        self.current_analysis_number = record.number
         self._render_logs()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -313,7 +360,9 @@ class LogcatApp(App[None]):
         name, argument = name.lower(), argument.strip()
         if name != "help":
             self.showing_help = False
-        if name != "analise":
+        if name not in {"analises"}:
+            self.showing_analysis_history = False
+        if name not in {"analise", "ver"}:
             self.analysis_text = None
         if name == "level":
             self.filters.min_level = None if argument.lower() == "all" else argument.upper()
@@ -353,6 +402,39 @@ class LogcatApp(App[None]):
         elif name == "analise":
             self._start_analysis(argument)
             return
+        elif name == "analises":
+            self.analysis_text = None
+            self.showing_analysis_history = True
+        elif name == "ver":
+            try:
+                number = int(argument)
+            except ValueError:
+                self.notify("Use /ver número, por exemplo /ver 1", severity="warning")
+                return
+            record = next((item for item in self.analysis_history if item.number == number), None)
+            if record is None:
+                self.notify(f"Análise #{number} não existe nesta sessão.", severity="warning")
+                return
+            self.current_analysis_number = number
+            self.analysis_text = record.result
+        elif name == "logs":
+            self.analysis_text = None
+            self.current_analysis_number = None
+            self.showing_analysis_history = False
+        elif name == "model":
+            model = None if argument.lower() == "clear" else argument or None
+            if model is None and argument.lower() != "clear":
+                self.notify("Use /model nome-do-modelo ou /model clear", severity="warning")
+                return
+            self.config = AppConfig(
+                adb_path=self.config.adb_path,
+                serial=self.config.serial,
+                max_buffer_lines=self.config.max_buffer_lines,
+                codex_model=model,
+            )
+            self.analyzer.model = model
+            save_config(self.config, self.config_path)
+            self.notify(f"Modelo Codex: {model or 'padrão'}")
         elif name == "find":
             self.filters.search_query = None if argument.lower() == "clear" else argument or None
         elif name == "regex":
@@ -374,17 +456,30 @@ class LogcatApp(App[None]):
         elif name == "restart" and self.stream is not None:
             self.stream.restart()
         elif name == "device" and self.stream is not None:
-            self.config = AppConfig(self.config.adb_path, argument or None, self.config.max_buffer_lines)
+            self.config = AppConfig(
+                adb_path=self.config.adb_path,
+                serial=argument or None,
+                max_buffer_lines=self.config.max_buffer_lines,
+                codex_model=self.config.codex_model,
+            )
             if hasattr(self.stream, "client"):
                 self.stream.client.serial = self.config.serial
                 self.stream.restart()
             else:
                 self.stream.restart(serial=self.config.serial)
         elif name == "config" and argument.startswith("adb "):
-            self.config = AppConfig(argument[4:].strip(), self.config.serial, self.config.max_buffer_lines)
+            self.config = AppConfig(
+                adb_path=argument[4:].strip(),
+                serial=self.config.serial,
+                max_buffer_lines=self.config.max_buffer_lines,
+                codex_model=self.config.codex_model,
+            )
             save_config(self.config, self.config_path)
         elif name == "config" and argument == "show":
-            self.notify(f"ADB: {self.config.adb_path or 'adb'} | serial: {self.config.serial or 'auto'}")
+            self.notify(
+                f"ADB: {self.config.adb_path or 'adb'} | serial: {self.config.serial or 'auto'} | "
+                f"modelo: {self.config.codex_model or 'padrão'}"
+            )
         elif name == "save":
             self._save_visible(argument)
         elif name == "adb-clear":

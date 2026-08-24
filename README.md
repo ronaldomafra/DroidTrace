@@ -88,6 +88,7 @@ export ADB_PATH="C:/Android/android-studio-sdk/platform-tools/adb.exe"
 --serial SERIAL             Serial do dispositivo Android/emulador
 --config ARQUIVO            Caminho alternativo para o JSON de configuração
 --max-buffer-lines NUMERO   Máximo de linhas mantidas na memória (padrão: 10000)
+--codex-model MODELO        Modelo usado por /analise; sobrescreve a configuração salva
 -h, --help                  Mostra a ajuda
 ```
 
@@ -155,7 +156,41 @@ Inclua um foco opcional após o comando:
 /analise priorize erros de rede e timeouts
 ```
 
-A análise é assíncrona e não bloqueia o prompt. O aplicativo envia no máximo 250 linhas filtradas, executa `codex exec --ephemeral --sandbox read-only` e exibe a resposta no painel principal. Digite qualquer filtro, busca ou comando depois da resposta para voltar à visualização de logs.
+A análise é assíncrona e não bloqueia o prompt. O aplicativo envia no máximo 250 linhas filtradas, executa `codex exec --ephemeral --sandbox read-only` e exibe uma resposta padronizada, renderizada por seções — sem tabelas Markdown.
+
+A resposta contém: **Resumo**, **Severidade**, **Evidências**, **Causas prováveis**, **Ações recomendadas** e **Limitações**.
+
+#### Modelo Codex
+
+Defina o modelo para a sessão e salve-o na configuração:
+
+```text
+/model gpt-5.4
+```
+
+Para voltar ao modelo padrão do Codex:
+
+```text
+/model clear
+```
+
+Também é possível definir o modelo ao iniciar:
+
+```bash
+.venv/Scripts/logcat-manager --codex-model gpt-5.4
+```
+
+#### Histórico da sessão e retorno aos logs
+
+As análises ficam disponíveis enquanto o aplicativo está aberto:
+
+```text
+/analises       # lista as análises desta sessão
+/ver 1          # abre a análise número 1
+/logs           # volta imediatamente à visualização dos logs
+```
+
+Digitar qualquer filtro, busca ou comando operacional também retorna aos logs.
 
 > Atenção: as linhas selecionadas são enviadas ao serviço do Codex. Evite analisar logs que contenham tokens, senhas, identificadores pessoais ou outros dados sensíveis.
 

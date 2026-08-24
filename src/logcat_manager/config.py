@@ -15,6 +15,7 @@ class AppConfig:
     adb_path: str | None = None
     serial: str | None = None
     max_buffer_lines: int = 10_000
+    codex_model: str | None = None
 
 
 def default_config_path() -> Path:
@@ -32,6 +33,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         adb_path=data.get("adb_path"),
         serial=data.get("serial"),
         max_buffer_lines=int(data.get("max_buffer_lines", 10_000)),
+        codex_model=data.get("codex_model"),
     )
 
 

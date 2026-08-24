@@ -15,7 +15,7 @@ class Command:
     confirmed: bool = False
 
 
-_NO_ARGUMENT = {"help", "pause", "resume", "follow", "restart", "quit"}
+_NO_ARGUMENT = {"help", "pause", "resume", "follow", "restart", "quit", "analises", "logs"}
 _CLEARABLE = {"tag", "pid", "find", "regex"}
 
 
@@ -65,6 +65,15 @@ def parse_command(text: str) -> Command:
         return Command(name, (arguments[0],))
     if name == "analise":
         return Command(name, (" ".join(arguments),))
+    if name == "model":
+        _require_count(name, arguments, 1)
+        return Command(name, (arguments[0],))
+    if name == "ver":
+        _require_count(name, arguments, 1)
+        try:
+            return Command(name, (int(arguments[0]),))
+        except ValueError as error:
+            raise CommandError("ver expects an analysis number") from error
     if name == "device":
         _require_count(name, arguments, 1)
         return Command(name, (arguments[0],))

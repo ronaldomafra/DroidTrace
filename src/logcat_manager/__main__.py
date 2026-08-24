@@ -12,6 +12,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--serial", help="ADB device serial")
     parser.add_argument("--config", type=Path, help="Path to configuration JSON")
     parser.add_argument("--max-buffer-lines", type=int, help="Maximum local log entries")
+    parser.add_argument("--codex-model", help="Codex model for /analise")
     return parser.parse_args(argv)
 
 
@@ -23,6 +24,7 @@ def main(argv: list[str] | None = None) -> None:
         adb_path=adb_path,
         serial=args.serial or config.serial,
         max_buffer_lines=args.max_buffer_lines or config.max_buffer_lines,
+        codex_model=args.codex_model or config.codex_model,
     )
     from .app import LogcatApp
 

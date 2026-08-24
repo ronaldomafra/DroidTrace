@@ -97,6 +97,19 @@ async def test_package_command_resolves_all_package_processes():
 
 
 @pytest.mark.asyncio
+async def test_model_command_persists_and_updates_codex_analyzer(tmp_path):
+    from logcat_manager.app import LogcatApp
+
+    analyzer = FakeAnalyzer()
+    app = LogcatApp(stream=FakeStream(), analyzer=analyzer, config_path=tmp_path / "config.json", auto_start=False)
+    async with app.run_test():
+        app._execute("/model gpt-5.4")
+
+        assert app.config.codex_model == "gpt-5.4"
+        assert analyzer.model == "gpt-5.4"
+
+
+@pytest.mark.asyncio
 async def test_help_replaces_log_view_with_usage_reference():
     from textual.widgets import Input
 
@@ -130,8 +143,20 @@ async def test_analise_sends_visible_logs_and_displays_codex_result():
         await pilot.pause(0.1)
 
         assert app.analysis_text == "Análise: timeout de rede detectado."
+        assert len(app.analysis_history) == 1
+        assert app.analysis_history[0].prompt == "priorize rede"
         assert analyzer.calls[0][1] == "priorize rede"
         assert "Network: timeout" in analyzer.calls[0][0][0].raw
+
+        app._execute("/logs")
+        assert app.analysis_text is None
+
+        app._execute("/analises")
+        assert app.showing_analysis_history is True
+
+        app._execute("/ver 1")
+        assert app.current_analysis_number == 1
+        assert app.analysis_text == "Análise: timeout de rede detectado."
 
 
 @pytest.mark.asyncio

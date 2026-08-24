@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-from logcat_manager.analysis import CodexAnalyzer
+from logcat_manager.analysis import CodexAnalyzer, format_analysis
 from logcat_manager.models import LogEntry
 
 
@@ -18,7 +18,7 @@ def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monk
         output_path.write_text("Resumo: erro de rede.", encoding="utf-8")
         return SimpleNamespace(returncode=0, stderr="")
 
-    analyzer = CodexAnalyzer(runner=fake_run, temp_dir=tmp_path)
+    analyzer = CodexAnalyzer(runner=fake_run, temp_dir=tmp_path, model="gpt-5.4")
     result = analyzer.analyze(
         [
             LogEntry(raw="08-21 10:00:00.000  123  123 E Network: timeout"),
@@ -31,6 +31,7 @@ def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monk
     args, kwargs = calls[0]
     assert args[:3] == ["C:/npm/codex.CMD", "exec", "--ephemeral"]
     assert "--skip-git-repo-check" in args
+    assert args[args.index("-m") + 1] == "gpt-5.4"
     assert "read-only" in args
     assert args[-1] == "-"
     assert "priorize erros de rede" in kwargs["input"]
@@ -39,3 +40,16 @@ def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monk
     assert kwargs["encoding"] == "utf-8"
     assert kwargs["errors"] == "replace"
     assert kwargs["cwd"] == str(tmp_path)
+
+
+def test_format_analysis_splits_standard_sections_without_markdown_table():
+    sections = format_analysis(
+        """RESUMO:\nTimeout de rede no login.\n\nSEVERIDADE:\nALTA\n\nEVIDÊNCIAS:\n- Network: timeout\n\nAÇÕES RECOMENDADAS:\n1. Verificar endpoint\n2. Revisar timeout"""
+    )
+
+    assert sections == [
+        ("RESUMO", ["Timeout de rede no login."]),
+        ("SEVERIDADE", ["ALTA"]),
+        ("EVIDÊNCIAS", ["- Network: timeout"]),
+        ("AÇÕES RECOMENDADAS", ["1. Verificar endpoint", "2. Revisar timeout"]),
+    ]
