@@ -36,4 +36,6 @@ def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monk
     assert "priorize erros de rede" in kwargs["input"]
     assert "Network: timeout" in kwargs["input"]
     assert kwargs["timeout"] == 120
+    assert kwargs["encoding"] == "utf-8"
+    assert kwargs["errors"] == "replace"
     assert kwargs["cwd"] == str(tmp_path)

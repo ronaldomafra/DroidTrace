@@ -57,6 +57,8 @@ class CodexAnalyzer:
                 input=self._build_prompt(lines, user_prompt),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 cwd=str(self.temp_dir),
             )
