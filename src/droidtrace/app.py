@@ -15,8 +15,13 @@ from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
+from .recording import LogRecorder
+from .sessions import AnalysisRecord as PersistedAnalysisRecord
+from .sessions import Session, SessionRepository
 from .analysis import CodexAnalyzer, format_analysis
-from .config import AppConfig, save_config
+from .config import AppConfig, default_config_path, save_config
+from .configurator import ConfigScreen
+from .providers import ProviderSettings
 from .filters import LogBuffer, LogFilters
 from .parser import parse_log_line, style_for_priority
 
@@ -47,6 +52,10 @@ class LogcatApp(App[None]):
         ("analises", "Histórico", "Mostra análises desta sessão"),
         ("ver", "Abrir análise", "Uso: /ver número"),
         ("logs", "Voltar aos logs", "Fecha análise ou histórico"),
+        ("sessoes", "Sessões", "Lista sessões gravadas"),
+        ("sessao", "Sessão", "Uso: /sessao nova nome | /sessao abrir id"),
+        ("gravar", "Gravar logs", "Uso: /gravar iniciar [arquivo] | parar"),
+        ("configurar", "Configurador", "Seleciona provider e modelo"),
         ("model", "Modelo", "Uso: /model nome-do-modelo"),
         ("find", "Buscar", "Uso: /find timeout ou /find clear"),
         ("regex", "Regex", "Uso: /regex FATAL.*Exception"),
@@ -55,7 +64,6 @@ class LogcatApp(App[None]):
         ("follow", "Ir ao fim", "Segue as linhas recentes"),
         ("save", "Exportar", "Uso: /save C:/logs/logcat.txt"),
         ("clear", "Limpar tela", "Limpa somente o buffer local"),
-        ("adb-clear", "Limpar ADB", "Uso: /adb-clear confirm"),
         ("restart", "Reiniciar", "Reinicia a captura ADB"),
         ("quit", "Sair", "Fecha o aplicativo"),
     )
@@ -84,6 +92,16 @@ class LogcatApp(App[None]):
         self.analyzer = analyzer or CodexAnalyzer(model=self.config.codex_model)
         self.auto_start = auto_start
         self.buffer = LogBuffer(self.config.max_buffer_lines)
+        session_dir = Path(self.config.session_dir) if self.config.session_dir else default_config_path().parent / "sessions"
+        self.session_repository = SessionRepository(session_dir)
+        self.session: Session = self.session_repository.create(
+            name="Sessão atual",
+            provider=self.config.provider,
+            model=self.config.codex_model,
+            device_serial=self.config.serial,
+        )
+        recording_dir = Path(self.config.recording_dir) if self.config.recording_dir else session_dir
+        self.recorder = LogRecorder(recording_dir, session_id=self.session.id)
         self.filters = LogFilters()
         self.package_name: str | None = None
         self.showing_help = False
@@ -173,9 +191,36 @@ class LogcatApp(App[None]):
             self.query_one("#log-view", RichLog).scroll_end(animate=False)
             self._update_status()
 
+    def _open_configurator(self) -> None:
+        self.push_screen(
+            ConfigScreen(
+                ProviderSettings(self.config.provider, self.config.codex_model),
+                self.session_repository.directory,
+            ),
+            self._apply_provider_settings,
+        )
+
+    def _apply_provider_settings(self, settings: ProviderSettings | None) -> None:
+        if settings is None:
+            return
+        self.config = AppConfig(
+            adb_path=self.config.adb_path,
+            serial=self.config.serial,
+            max_buffer_lines=self.config.max_buffer_lines,
+            codex_model=settings.model,
+            provider=settings.provider,
+            session_dir=self.config.session_dir,
+            recording_dir=self.config.recording_dir,
+        )
+        self.analyzer.model = settings.model
+        save_config(self.config, self.config_path)
+        self.notify(f"Provider: {settings.provider} | modelo: {settings.model}")
+
     def on_mount(self) -> None:
         self.query_one("#command-input", Input).focus()
         self.query_one("#command-menu", OptionList).display = False
+        if self.auto_start and not (self.config_path or default_config_path()).exists():
+            self._open_configurator()
         if self.stream is None and self.auto_start:
             try:
                 from .adb import AdbLogcatStream
@@ -191,6 +236,11 @@ class LogcatApp(App[None]):
         self._update_status()
 
     def on_unmount(self) -> None:
+        path = self.recorder.close()
+        if path and path not in self.session.recording_paths:
+            self.session.recording_paths.append(path)
+        self.session.ended_at = datetime.now().isoformat()
+        self.session_repository.save(self.session)
         if self.stream is not None:
             self.stream.stop()
 
@@ -207,6 +257,7 @@ class LogcatApp(App[None]):
                 line = lines.get_nowait()
             except Empty:
                 break
+            self.recorder.write(line)
             entries.append(parse_log_line(line))
             processed += 1
         self.buffer.extend(entries)
@@ -215,6 +266,7 @@ class LogcatApp(App[None]):
         self._resume_follow_after_idle()
 
     def add_log_line(self, line: str) -> None:
+        self.recorder.write(line)
         entry = parse_log_line(line)
         self.buffer.append(entry)
         if not self.paused and not self.showing_help and not self.analysis_text and self._screen_stack:
@@ -336,6 +388,10 @@ class LogcatApp(App[None]):
             model=getattr(self.analyzer, "model", self.config.codex_model),
         )
         self.analysis_history.append(record)
+        self.session.analyses.append(
+            PersistedAnalysisRecord(record.created_at, record.prompt, record.result, record.model, record.number)
+        )
+        self.session_repository.save(self.session)
         self.current_analysis_number = record.number
         self._render_logs()
 
@@ -421,6 +477,60 @@ class LogcatApp(App[None]):
             self.analysis_text = None
             self.current_analysis_number = None
             self.showing_analysis_history = False
+        elif name == "gravar":
+            action, _, target = argument.partition(" ")
+            if action == "iniciar":
+                try:
+                    path = self.recorder.start(target or None)
+                except RuntimeError as error:
+                    self.notify(str(error), severity="warning")
+                    return
+                self.notify(f"Gravando logs em {path}")
+            elif action == "parar":
+                path = self.recorder.stop()
+                if path:
+                    if path not in self.session.recording_paths:
+                        self.session.recording_paths.append(path)
+                    self.session_repository.save(self.session)
+                    self.notify(f"Gravação salva em {path}")
+                else:
+                    self.notify("Nenhuma gravação ativa.", severity="warning")
+            else:
+                self.notify("Use /gravar iniciar [arquivo] ou /gravar parar", severity="warning")
+                return
+        elif name == "sessoes":
+            self.analysis_text = "\n".join(
+                f"{session.id}  {session.started_at}  {session.name}" for session in self.session_repository.recent(10)
+            ) or "Nenhuma sessão gravada."
+        elif name == "sessao":
+            action, _, value = argument.partition(" ")
+            if action == "nova":
+                self.session = self.session_repository.create(
+                    name=value or "Nova sessão",
+                    provider=self.config.provider,
+                    model=self.config.codex_model,
+                    device_serial=self.config.serial,
+                )
+                self.recorder = LogRecorder(self.recorder.directory, session_id=self.session.id)
+                self.analysis_history = []
+                self.notify(f"Sessão criada: {self.session.name}")
+            elif action == "abrir":
+                session = self.session_repository.load(value)
+                if session is None:
+                    self.notify("Sessão não encontrada.", severity="warning")
+                    return
+                self.session = session
+                self.analysis_history = [
+                    AnalysisRecord(item.number or index + 1, item.created_at, item.prompt, item.result, item.model)
+                    for index, item in enumerate(session.analyses)
+                ]
+                self.notify(f"Sessão aberta: {session.name}")
+            else:
+                self.notify("Use /sessao nova nome ou /sessao abrir id", severity="warning")
+                return
+        elif name == "configurar":
+            self._open_configurator()
+            return
         elif name == "model":
             model = None if argument.lower() == "clear" else argument or None
             if model is None and argument.lower() != "clear":
@@ -482,19 +592,6 @@ class LogcatApp(App[None]):
             )
         elif name == "save":
             self._save_visible(argument)
-        elif name == "adb-clear":
-            if argument != "confirm":
-                self.notify("Use :adb-clear confirm para limpar logs do dispositivo", severity="warning")
-                return
-            if self.stream is not None:
-                if hasattr(self.stream, "clear_device_logs"):
-                    self.stream.clear_device_logs()
-                elif hasattr(self.stream, "client"):
-                    self.stream.client.clear_logs()
-                else:
-                    self.notify("Stream não suporta limpeza do dispositivo", severity="error")
-                    return
-                self.notify("Buffer de logs do dispositivo limpo")
         elif name in {"quit", "exit"}:
             self.exit()
         elif name == "help":

@@ -233,12 +233,39 @@ Por segurança, `:save` não sobrescreve um arquivo existente. Informe outro nom
 
 ### Limpeza de logs
 
-| Comando | Efeito |
-|---|---|
-| `:clear` | Apaga somente o buffer local mostrado pelo aplicativo |
-| `:adb-clear confirm` | Executa `adb logcat -c` e apaga o buffer de logs do dispositivo |
+```text
+/clear
+```
 
-A limpeza remota exige obrigatoriamente `confirm`. Não execute `:adb-clear confirm` se quiser preservar os logs atuais do dispositivo.
+Limpa somente o buffer local mostrado pelo aplicativo. DroidTrace não expõe limpeza do buffer de logs do dispositivo.
+
+## Configurador, sessões e gravação
+
+Na primeira execução, DroidTrace abre um configurador para escolher provider, modelo e sessões recentes. Providers disponíveis: Codex, Claude, Kimi e OpenRouter. As chaves nunca são salvas: use `ANTHROPIC_API_KEY`, `KIMI_API_KEY` ou `OPENROUTER_API_KEY` conforme o provider. Codex usa a autenticação já configurada no CLI.
+
+Reabra o configurador a qualquer momento:
+
+```text
+/configurar
+```
+
+Sessões persistem metadados e análises, mas não logs brutos:
+
+```text
+/sessoes
+/sessao nova investigacao-rede
+/sessao abrir <id>
+```
+
+Grave logs raw em UTF-8 independentemente dos filtros exibidos:
+
+```text
+/gravar iniciar
+/gravar iniciar C:/logs/meu-caso.log
+/gravar parar
+```
+
+A gravação é encerrada automaticamente quando DroidTrace fecha.
 
 ## Cores das prioridades
 

@@ -16,6 +16,9 @@ class AppConfig:
     serial: str | None = None
     max_buffer_lines: int = 10_000
     codex_model: str | None = None
+    provider: str = "codex"
+    session_dir: str | None = None
+    recording_dir: str | None = None
 
 
 def default_config_path() -> Path:
@@ -34,6 +37,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         serial=data.get("serial"),
         max_buffer_lines=int(data.get("max_buffer_lines", 10_000)),
         codex_model=data.get("codex_model"),
+        provider=data.get("provider", "codex"),
+        session_dir=data.get("session_dir"),
+        recording_dir=data.get("recording_dir"),
     )
 
 

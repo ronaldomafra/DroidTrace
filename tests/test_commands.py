@@ -44,17 +44,6 @@ def test_local_clear_does_not_require_confirmation():
     assert parse_command("/clear") == Command("clear")
 
 
-@pytest.mark.parametrize("text", [":adb-clear"])
-def test_destructive_commands_reject_missing_literal_confirmation(text):
-    with pytest.raises(CommandError, match="confirm"):
-        parse_command(text)
-
-
-@pytest.mark.parametrize("text, name", [(":adb-clear confirm", "adb-clear")])
-def test_destructive_commands_accept_only_confirm_token(text, name):
-    assert parse_command(text) == Command(name, (), confirmed=True)
-
-
 @pytest.mark.parametrize("text", [":level X", ":pid nope", ":unknown", ":clear CONFIRM"])
 def test_invalid_commands_raise_friendly_error(text):
     with pytest.raises(CommandError):

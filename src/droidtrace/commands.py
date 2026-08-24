@@ -42,10 +42,6 @@ def parse_command(text: str) -> Command:
     if name == "clear":
         _require_count(name, arguments, 0)
         return Command(name)
-    if name == "adb-clear":
-        if arguments != ["confirm"]:
-            raise CommandError(f":{name} requires the literal token confirm")
-        return Command(name, confirmed=True)
     if name == "level":
         _require_count(name, arguments, 1)
         level = arguments[0].upper()
