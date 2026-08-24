@@ -53,6 +53,7 @@ async def test_slash_command_menu_is_visible_and_clickable():
         await pilot.pause()
         assert menu.display is True
         assert menu.option_count >= 5
+        assert str(menu.get_option_at_index(0).prompt) == "/help"
 
         command_input.value = "/level E"
         await pilot.pause()
@@ -77,6 +78,23 @@ async def test_package_command_resolves_all_package_processes():
 
         assert app.filters.pids == frozenset({1234, 5678})
         assert app.package_name == "br.com.tbs.afv.multiplatform"
+
+
+@pytest.mark.asyncio
+async def test_help_replaces_log_view_with_usage_reference():
+    from textual.widgets import Input
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    async with app.run_test() as pilot:
+        command_input = app.query_one("#command-input", Input)
+        command_input.value = "/help"
+        await pilot.pause()
+        await pilot.press("enter")
+
+        assert app.showing_help is True
+        assert any("/package" in line for line in app.help_lines())
 
 
 @pytest.mark.asyncio

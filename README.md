@@ -120,7 +120,9 @@ Os comandos antigos com `:` continuam compatíveis, mas o formato recomendado é
 
 ### Menu de comandos
 
-O menu explica cada ação e pode ser filtrado enquanto você digita, por exemplo `/reg` mostra o comando de regex. Ele fica oculto até você começar com `/`, preservando a área dos logs. Opções de risco, como limpar logs, nunca inserem `confirm` automaticamente: digite a confirmação explicitamente.
+O menu fica oculto para maximizar a leitura dos logs. Ao digitar `/`, ele mostra apenas os nomes dos comandos; continue digitando, como `/pac` ou `/reg`, para reduzir a lista. Clique em um comando para preenchê-lo no prompt. As explicações e exemplos completos ficam em `/help`, exibido na própria área de logs.
+
+Opções de risco, como limpar logs, nunca inserem `confirm` automaticamente: digite a confirmação explicitamente.
 
 ### Filtrar diretamente por package
 

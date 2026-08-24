@@ -21,19 +21,19 @@ class LogcatApp(App[None]):
     MAX_LINES_PER_TICK = 200
     MAX_RENDERED_LINES = 2_000
     COMMANDS = (
-        ("help", "Ajuda", "Mostra esta lista de comandos"),
-        ("level E", "Nível", "Exibe E e F; use /level all para remover"),
-        ("tag Activity", "Tag", "Filtra uma tag do log"),
-        ("pid 1234", "PID", "Filtra um processo pelo PID"),
-        ("package br.com.exemplo.app", "Package", "Localiza automaticamente os PIDs do app"),
-        ("find timeout", "Buscar", "Busca texto na mensagem"),
-        ("regex FATAL.*Exception", "Regex", "Busca com expressão regular"),
-        ("pause", "Pausar", "Para somente a atualização visual"),
+        ("help", "Ajuda", "Exibe esta referência na área de logs"),
+        ("level", "Nível", "Uso: /level E ou /level all"),
+        ("tag", "Tag", "Uso: /tag Activity ou /tag clear"),
+        ("pid", "PID", "Uso: /pid 1234 ou /pid clear"),
+        ("package", "Package", "Uso: /package br.com.exemplo.app"),
+        ("find", "Buscar", "Uso: /find timeout ou /find clear"),
+        ("regex", "Regex", "Uso: /regex FATAL.*Exception"),
+        ("pause", "Pausar", "Pausa a atualização visual"),
         ("resume", "Continuar", "Retoma a atualização visual"),
-        ("follow", "Ir ao fim", "Segue as linhas mais recentes"),
-        ("save", "Exportar", "Digite /save C:/logs/logcat.txt"),
-        ("clear", "Limpar tela", "Exige /clear confirm"),
-        ("adb-clear", "Limpar ADB", "Exige /adb-clear confirm"),
+        ("follow", "Ir ao fim", "Segue as linhas recentes"),
+        ("save", "Exportar", "Uso: /save C:/logs/logcat.txt"),
+        ("clear", "Limpar tela", "Uso: /clear confirm"),
+        ("adb-clear", "Limpar ADB", "Uso: /adb-clear confirm"),
         ("restart", "Reiniciar", "Reinicia a captura ADB"),
         ("quit", "Sair", "Fecha o aplicativo"),
     )
@@ -62,6 +62,7 @@ class LogcatApp(App[None]):
         self.buffer = LogBuffer(self.config.max_buffer_lines)
         self.filters = LogFilters()
         self.package_name: str | None = None
+        self.showing_help = False
         self.paused = False
         self.following = True
         self.command_history: list[str] = []
@@ -86,14 +87,19 @@ class LogcatApp(App[None]):
             or normalized in label.casefold()
             or normalized in description.casefold()
         ]
+        return [Option(f"/{command}", id=command) for command, _, _ in matches]
+
+    def help_lines(self) -> list[str]:
         return [
-            Option(f"[bold cyan]/{command}[/]  [bold]{label}[/] — {description}", id=command)
-            for command, label, description in matches
+            "LOGCAT MANAGER — comandos",
+            "Digite / seguido do comando. Qualquer outro comando volta aos logs.",
+            "",
+            *[f"/{command:<10} {description}" for command, _, description in self.COMMANDS],
         ]
 
     def on_input_changed(self, event: Input.Changed) -> None:
         menu = self.query_one("#command-menu", OptionList)
-        if event.value.startswith(("/", ":")) or not event.value:
+        if event.value.startswith(("/", ":")):
             menu.display = True
             menu.set_options(self._command_options(event.value))
         else:
@@ -141,12 +147,12 @@ class LogcatApp(App[None]):
                 break
             self.buffer.append(parse_log_line(line))
             processed += 1
-        if processed and not self.paused and self._screen_stack:
+        if processed and not self.paused and not self.showing_help and self._screen_stack:
             self._render_logs()
 
     def add_log_line(self, line: str) -> None:
         self.buffer.append(parse_log_line(line))
-        if not self.paused and self._screen_stack:
+        if not self.paused and not self.showing_help and self._screen_stack:
             self._render_logs()
 
     def entries_for_render(self) -> list[Any]:
@@ -156,6 +162,10 @@ class LogcatApp(App[None]):
     def _render_logs(self) -> None:
         log = self.query_one("#log-view", RichLog)
         log.clear()
+        if self.showing_help:
+            for line in self.help_lines():
+                log.write(Text(line, style="bold cyan" if line.startswith("LOGCAT") else "white"))
+            return
         visible = self.entries_for_render()
         for entry in visible:
             log.write(Text(entry.raw, style=style_for_priority(entry.priority)))
@@ -197,11 +207,14 @@ class LogcatApp(App[None]):
         if text.startswith("/"):
             text = ":" + text[1:]
         if not text.startswith(":"):
+            self.showing_help = False
             self.filters.search_query = text or None
             self._render_logs()
             return
         name, _, argument = text[1:].partition(" ")
         name, argument = name.lower(), argument.strip()
+        if name != "help":
+            self.showing_help = False
         if name == "level":
             self.filters.min_level = None if argument.lower() == "all" else argument.upper()
         elif name == "tag":
@@ -287,7 +300,7 @@ class LogcatApp(App[None]):
         elif name in {"quit", "exit"}:
             self.exit()
         elif name == "help":
-            self.notify("Filtros: :level :tag :pid :find :regex | :pause :resume :follow :save :clear :adb-clear :quit")
+            self.showing_help = True
         else:
             self.notify(f"Comando desconhecido: {name}. Use :help", severity="error")
             return
