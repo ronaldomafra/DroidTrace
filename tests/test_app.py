@@ -26,6 +26,15 @@ class FakeStream:
         return None
 
 
+class FakeAnalyzer:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def analyze(self, entries, user_prompt: str) -> str:
+        self.calls.append((list(entries), user_prompt))
+        return "Análise: timeout de rede detectado."
+
+
 @pytest.mark.asyncio
 async def test_prompt_remains_focused_after_filter_command():
     from logcat_manager.app import LogcatApp
@@ -95,6 +104,27 @@ async def test_help_replaces_log_view_with_usage_reference():
 
         assert app.showing_help is True
         assert any("/package" in line for line in app.help_lines())
+
+
+@pytest.mark.asyncio
+async def test_analise_sends_visible_logs_and_displays_codex_result():
+    from textual.widgets import Input
+
+    from logcat_manager.app import LogcatApp
+
+    analyzer = FakeAnalyzer()
+    app = LogcatApp(stream=FakeStream(), analyzer=analyzer, auto_start=False)
+    app.add_log_line("08-21 10:00:00.000  123  123 E Network: timeout")
+    async with app.run_test() as pilot:
+        command_input = app.query_one("#command-input", Input)
+        command_input.value = "/analise priorize rede"
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause(0.1)
+
+        assert app.analysis_text == "Análise: timeout de rede detectado."
+        assert analyzer.calls[0][1] == "priorize rede"
+        assert "Network: timeout" in analyzer.calls[0][0][0].raw
 
 
 @pytest.mark.asyncio

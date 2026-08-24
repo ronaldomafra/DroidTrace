@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from queue import Empty
+from threading import Thread
 from typing import Any
 
 from rich.text import Text
@@ -10,6 +11,7 @@ from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
+from .analysis import CodexAnalyzer
 from .config import AppConfig, save_config
 from .filters import LogBuffer, LogFilters
 from .parser import parse_log_line, style_for_priority
@@ -26,6 +28,7 @@ class LogcatApp(App[None]):
         ("tag", "Tag", "Uso: /tag Activity ou /tag clear"),
         ("pid", "PID", "Uso: /pid 1234 ou /pid clear"),
         ("package", "Package", "Uso: /package br.com.exemplo.app"),
+        ("analise", "Análise Codex", "Uso: /analise [foco opcional]"),
         ("find", "Buscar", "Uso: /find timeout ou /find clear"),
         ("regex", "Regex", "Uso: /regex FATAL.*Exception"),
         ("pause", "Pausar", "Pausa a atualização visual"),
@@ -49,6 +52,7 @@ class LogcatApp(App[None]):
     def __init__(
         self,
         stream: Any | None = None,
+        analyzer: Any | None = None,
         *,
         config: AppConfig | None = None,
         config_path: Path | None = None,
@@ -58,11 +62,14 @@ class LogcatApp(App[None]):
         self.config = config or AppConfig()
         self.config_path = config_path
         self.stream = stream
+        self.analyzer = analyzer or CodexAnalyzer()
         self.auto_start = auto_start
         self.buffer = LogBuffer(self.config.max_buffer_lines)
         self.filters = LogFilters()
         self.package_name: str | None = None
         self.showing_help = False
+        self.analysis_text: str | None = None
+        self.analysis_running = False
         self.paused = False
         self.following = True
         self.command_history: list[str] = []
@@ -166,6 +173,12 @@ class LogcatApp(App[None]):
             for line in self.help_lines():
                 log.write(Text(line, style="bold cyan" if line.startswith("LOGCAT") else "white"))
             return
+        if self.analysis_text:
+            log.write(Text("ANÁLISE CODEX", style="bold magenta"))
+            log.write("")
+            for line in self.analysis_text.splitlines():
+                log.write(Text(line, style="white"))
+            return
         visible = self.entries_for_render()
         for entry in visible:
             log.write(Text(entry.raw, style=style_for_priority(entry.priority)))
@@ -195,6 +208,37 @@ class LogcatApp(App[None]):
             f"{state} | {visible}/{len(self.buffer)} linhas | {'; '.join(active) or 'sem filtros'}"
         )
 
+    def _start_analysis(self, user_prompt: str) -> None:
+        entries = self.entries_for_render()
+        if not entries:
+            self.notify("Não há logs visíveis para analisar.", severity="warning")
+            return
+        if self.analysis_running:
+            self.notify("Uma análise já está em andamento.", severity="warning")
+            return
+        self.analysis_running = True
+        self.analysis_text = None
+        self.notify("Enviando logs filtrados para o Codex…")
+        Thread(target=self._run_analysis, args=(entries, user_prompt), daemon=True).start()
+
+    def _run_analysis(self, entries: list[Any], user_prompt: str) -> None:
+        try:
+            result = self.analyzer.analyze(entries, user_prompt)
+        except Exception as error:
+            self.call_from_thread(self._finish_analysis, None, str(error))
+        else:
+            self.call_from_thread(self._finish_analysis, result, None)
+
+    def _finish_analysis(self, result: str | None, error: str | None) -> None:
+        self.analysis_running = False
+        if error:
+            self.notify(f"Falha na análise Codex: {error}", severity="error")
+            self._render_logs()
+            return
+        self.showing_help = False
+        self.analysis_text = result
+        self._render_logs()
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         command = event.value.strip()
         event.input.value = ""
@@ -208,6 +252,7 @@ class LogcatApp(App[None]):
             text = ":" + text[1:]
         if not text.startswith(":"):
             self.showing_help = False
+            self.analysis_text = None
             self.filters.search_query = text or None
             self._render_logs()
             return
@@ -215,6 +260,8 @@ class LogcatApp(App[None]):
         name, argument = name.lower(), argument.strip()
         if name != "help":
             self.showing_help = False
+        if name != "analise":
+            self.analysis_text = None
         if name == "level":
             self.filters.min_level = None if argument.lower() == "all" else argument.upper()
         elif name == "tag":
@@ -250,6 +297,9 @@ class LogcatApp(App[None]):
                 self.filters.pids = frozenset(pids)
                 self.package_name = argument
                 self.notify(f"Package {argument}: PID(s) {', '.join(map(str, pids))}")
+        elif name == "analise":
+            self._start_analysis(argument)
+            return
         elif name == "find":
             self.filters.search_query = None if argument.lower() == "clear" else argument or None
         elif name == "regex":

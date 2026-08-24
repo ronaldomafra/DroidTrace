@@ -63,6 +63,8 @@ def parse_command(text: str) -> Command:
     if name == "package":
         _require_count(name, arguments, 1)
         return Command(name, (arguments[0],))
+    if name == "analise":
+        return Command(name, (" ".join(arguments),))
     if name == "device":
         _require_count(name, arguments, 1)
         return Command(name, (arguments[0],))

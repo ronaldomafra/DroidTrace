@@ -14,6 +14,7 @@ from logcat_manager.commands import Command, CommandError, parse_command
         (":tag Network", "tag", ("Network",)),
         (":pid 123", "pid", (123,)),
         ("/package br.com.tbs.afv.multiplatform", "package", ("br.com.tbs.afv.multiplatform",)),
+        ("/analise priorize erros de rede", "analise", ("priorize erros de rede",)),
         (":find fatal exception", "find", ("fatal exception",)),
         (":regex timeout.*", "regex", ("timeout.*",)),
         (":pause", "pause", ()),

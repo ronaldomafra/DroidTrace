@@ -138,6 +138,24 @@ O aplicativo executa `adb shell pidof` internamente e aplica o filtro a todos os
 /package clear
 ```
 
+### Analisar logs com Codex
+
+Depois de aplicar filtros, envie as linhas visíveis ao Codex para receber uma análise na própria área de logs:
+
+```text
+/analise
+```
+
+Inclua um foco opcional após o comando:
+
+```text
+/analise priorize erros de rede e timeouts
+```
+
+A análise é assíncrona e não bloqueia o prompt. O aplicativo envia no máximo 250 linhas filtradas, executa `codex exec --ephemeral --sandbox read-only` e exibe a resposta no painel principal. Digite qualquer filtro, busca ou comando depois da resposta para voltar à visualização de logs.
+
+> Atenção: as linhas selecionadas são enviadas ao serviço do Codex. Evite analisar logs que contenham tokens, senhas, identificadores pessoais ou outros dados sensíveis.
+
 | Comando | Descrição |
 |---|---|
 | `:level E` | Mostra somente erros `E` e fatais `F` |
