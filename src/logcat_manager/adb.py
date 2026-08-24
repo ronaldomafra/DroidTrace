@@ -66,10 +66,12 @@ class AdbClient:
 
 
 class AdbLogcatStream:
-    def __init__(self, executable: str = "adb", serial: str | None = None) -> None:
+    def __init__(self, executable: str = "adb", serial: str | None = None, *, max_queue_lines: int = 5_000) -> None:
+        if max_queue_lines <= 0:
+            raise ValueError("max_queue_lines must be positive")
         self.client = AdbClient(executable, serial)
-        self.lines: queue.Queue[str] = queue.Queue()
-        self.errors: queue.Queue[str] = queue.Queue()
+        self.lines: queue.Queue[str] = queue.Queue(maxsize=max_queue_lines)
+        self.errors: queue.Queue[str] = queue.Queue(maxsize=max_queue_lines)
         self.process: subprocess.Popen[str] | None = None
         self._stop_event = threading.Event()
         self._threads: list[threading.Thread] = []
@@ -114,10 +116,21 @@ class AdbLogcatStream:
         thread.start()
         return thread
 
+    @staticmethod
+    def _enqueue_line(destination: queue.Queue[str], line: str) -> None:
+        try:
+            destination.put_nowait(line)
+        except queue.Full:
+            try:
+                destination.get_nowait()
+            except queue.Empty:
+                pass
+            destination.put_nowait(line)
+
     def _read_lines(self, source: TextIO | None, destination: queue.Queue[str]) -> None:
         if source is None:
             return
         for line in source:
             if self._stop_event.is_set():
                 return
-            destination.put(line.rstrip("\r\n"))
+            self._enqueue_line(destination, line.rstrip("\r\n"))

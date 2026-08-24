@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from queue import Empty
 from threading import Thread
+from time import monotonic
 from typing import Any
 
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
@@ -20,8 +22,10 @@ from .parser import parse_log_line, style_for_priority
 class LogcatApp(App[None]):
     """Interactive terminal interface for a local ADB logcat stream."""
 
-    MAX_LINES_PER_TICK = 200
-    MAX_RENDERED_LINES = 2_000
+    MAX_LINES_PER_TICK = 100
+    MAX_RENDERED_LINES = 1_000
+    STATUS_REFRESH_SECONDS = 0.5
+    AUTO_FOLLOW_IDLE_SECONDS = 3.0
     COMMANDS = (
         ("help", "Ajuda", "Exibe esta referência na área de logs"),
         ("level", "Nível", "Uso: /level E ou /level all"),
@@ -72,12 +76,20 @@ class LogcatApp(App[None]):
         self.analysis_running = False
         self.paused = False
         self.following = True
+        self.last_manual_scroll_at: float | None = None
         self.command_history: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Vertical():
-            yield RichLog(id="log-view", highlight=True, markup=True, wrap=True)
+            yield RichLog(
+                id="log-view",
+                max_lines=self.MAX_RENDERED_LINES,
+                highlight=True,
+                markup=True,
+                wrap=False,
+                auto_scroll=False,
+            )
             yield Static(id="status")
             yield OptionList(*self._command_options(), id="command-menu", compact=True)
             yield Input(placeholder="Digite / para comandos ou texto para pesquisar", id="command-input")
@@ -119,6 +131,30 @@ class LogcatApp(App[None]):
         command_input.value = f"/{event.option_id}"
         command_input.focus()
 
+    def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        self._pause_follow_for_manual_scroll(event)
+
+    def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        self._pause_follow_for_manual_scroll(event)
+
+    def _pause_follow_for_manual_scroll(self, event: events.MouseEvent) -> None:
+        if not self.is_mounted or event.widget is not self.query_one("#log-view", RichLog):
+            return
+        self.following = False
+        self.last_manual_scroll_at = monotonic()
+        self._update_status()
+
+    def _resume_follow_after_idle(self) -> None:
+        if self.following or self.last_manual_scroll_at is None:
+            return
+        if monotonic() - self.last_manual_scroll_at < self.AUTO_FOLLOW_IDLE_SECONDS:
+            return
+        self.following = True
+        self.last_manual_scroll_at = None
+        if self.is_mounted:
+            self.query_one("#log-view", RichLog).scroll_end(animate=False)
+            self._update_status()
+
     def on_mount(self) -> None:
         self.query_one("#command-input", Input).focus()
         self.query_one("#command-menu", OptionList).display = False
@@ -146,25 +182,41 @@ class LogcatApp(App[None]):
         lines = getattr(self.stream, "lines", getattr(self.stream, "events", None))
         if lines is None:
             return
+        entries = []
         processed = 0
         while processed < self.MAX_LINES_PER_TICK:
             try:
                 line = lines.get_nowait()
             except Empty:
                 break
-            self.buffer.append(parse_log_line(line))
+            entries.append(parse_log_line(line))
             processed += 1
-        if processed and not self.paused and not self.showing_help and self._screen_stack:
-            self._render_logs()
+        self.buffer.extend(entries)
+        if entries and not self.paused and not self.showing_help and not self.analysis_text and self._screen_stack:
+            self._append_entries(entries)
+        self._resume_follow_after_idle()
 
     def add_log_line(self, line: str) -> None:
-        self.buffer.append(parse_log_line(line))
-        if not self.paused and not self.showing_help and self._screen_stack:
-            self._render_logs()
+        entry = parse_log_line(line)
+        self.buffer.append(entry)
+        if not self.paused and not self.showing_help and not self.analysis_text and self._screen_stack:
+            self._append_entries([entry])
 
     def entries_for_render(self) -> list[Any]:
         """Return the newest filtered entries that fit the responsive view."""
         return self.filters.apply(self.buffer)[-self.MAX_RENDERED_LINES :]
+
+    def _append_entries(self, entries: list[Any]) -> None:
+        """Append fresh matching entries without rebuilding the RichLog widget."""
+        log = self.query_one("#log-view", RichLog)
+        for entry in entries:
+            if self.filters.matches(entry):
+                log.write(
+                    Text(entry.raw, style=style_for_priority(entry.priority)),
+                    scroll_end=self.following,
+                    animate=False,
+                )
+        self._update_status()
 
     def _render_logs(self) -> None:
         log = self.query_one("#log-view", RichLog)
@@ -232,7 +284,8 @@ class LogcatApp(App[None]):
     def _finish_analysis(self, result: str | None, error: str | None) -> None:
         self.analysis_running = False
         if error:
-            self.notify(f"Falha na análise Codex: {error}", severity="error")
+            self.showing_help = False
+            self.analysis_text = f"ANÁLISE CODEX FALHOU\n{error}"
             self._render_logs()
             return
         self.showing_help = False
@@ -370,4 +423,5 @@ class LogcatApp(App[None]):
 
     def action_follow(self) -> None:
         self.following = True
+        self.last_manual_scroll_at = None
         self.query_one("#log-view", RichLog).scroll_end(animate=False)

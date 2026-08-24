@@ -103,12 +103,15 @@ A tela possui:
 
 - área principal rolável com os logs;
 - buffer local circular de até 10.000 linhas por padrão (ajustável com `--max-buffer-lines`);
-- janela visual limitada às 2.000 linhas filtradas mais recentes para manter o terminal responsivo;
+- fila ADB limitada a 5.000 linhas recentes: sob carga, linhas antigas são descartadas antes de bloquear a interface;
+- janela visual incremental limitada a 1.000 linhas, sem redesenhar o histórico a cada novo log;
 - cores por prioridade (`V`, `D`, `I`, `W`, `E` e `F`);
 - barra de status com quantidade de linhas e filtros ativos;
 - campo de comando sempre ativo no rodapé.
 
 O campo inferior fica sempre ativo. Digite `/` para abrir/filtrar o menu de comandos; clique em uma opção para preencher o prompt e ajuste os argumentos antes de pressionar `Enter`. Texto sem `/` ou `:` é uma busca rápida.
+
+Ao rolar a área de logs com o mouse, o acompanhamento automático é pausado para leitura. Após 3 segundos sem nova rolagem, ele volta ao fim automaticamente; `End` ou `/follow` também retomam o acompanhamento imediatamente.
 
 Os comandos antigos com `:` continuam compatíveis, mas o formato recomendado é com `/`:
 

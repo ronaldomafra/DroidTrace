@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from queue import Queue
+from time import monotonic
+from unittest.mock import patch
 
 import pytest
 
@@ -33,6 +35,11 @@ class FakeAnalyzer:
     def analyze(self, entries, user_prompt: str) -> str:
         self.calls.append((list(entries), user_prompt))
         return "Análise: timeout de rede detectado."
+
+
+class FailingAnalyzer:
+    def analyze(self, entries, user_prompt: str) -> str:
+        raise RuntimeError("Codex indisponível")
 
 
 @pytest.mark.asyncio
@@ -128,6 +135,24 @@ async def test_analise_sends_visible_logs_and_displays_codex_result():
 
 
 @pytest.mark.asyncio
+async def test_analise_error_is_shown_in_log_view_without_error_toast():
+    from textual.widgets import Input
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), analyzer=FailingAnalyzer(), auto_start=False)
+    app.add_log_line("08-21 10:00:00.000  123  123 E Network: timeout")
+    async with app.run_test() as pilot:
+        command_input = app.query_one("#command-input", Input)
+        command_input.value = "/analise"
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause(0.1)
+
+        assert app.analysis_text == "ANÁLISE CODEX FALHOU\nCodex indisponível"
+
+
+@pytest.mark.asyncio
 async def test_local_clear_requires_confirm():
     from logcat_manager.app import LogcatApp
 
@@ -149,6 +174,39 @@ async def test_rendering_a_log_line_does_not_raise():
     async with app.run_test():
         app.add_log_line("08-21 10:12:13.123  1234  5678 E MyTag: boom")
         assert len(app.buffer) == 1
+
+
+@pytest.mark.asyncio
+async def test_live_logs_append_without_repainting_the_entire_view():
+    from textual.widgets import RichLog
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    async with app.run_test():
+        log = app.query_one("#log-view", RichLog)
+        with patch.object(log, "clear") as clear:
+            app.add_log_line("08-21 10:12:13.123  1234  5678 I MyTag: incremental")
+            clear.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_manual_scroll_pauses_follow_then_resumes_after_idle():
+    from textual import events
+    from textual.widgets import RichLog
+
+    from logcat_manager.app import LogcatApp
+
+    app = LogcatApp(stream=FakeStream(), auto_start=False)
+    async with app.run_test():
+        log = app.query_one("#log-view", RichLog)
+        event = events.MouseScrollUp(log, 0, 0, 0, 1, 0, False, False, False)
+        app.on_mouse_scroll_up(event)
+        assert app.following is False
+
+        app.last_manual_scroll_at = monotonic() - app.AUTO_FOLLOW_IDLE_SECONDS
+        app._resume_follow_after_idle()
+        assert app.following is True
 
 
 def test_drain_processes_only_one_bounded_batch_per_tick():

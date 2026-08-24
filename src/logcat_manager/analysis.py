@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 import uuid
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -29,7 +30,7 @@ class CodexAnalyzer:
     ) -> None:
         self.codex_executable = codex_executable
         self.runner = runner
-        self.temp_dir = temp_dir or Path.cwd()
+        self.temp_dir = temp_dir or Path(tempfile.gettempdir()) / "logcat-manager-codex"
         self.timeout = timeout
 
     def analyze(self, entries: Iterable[LogEntry], user_prompt: str = "") -> str:
@@ -46,6 +47,7 @@ class CodexAnalyzer:
                     executable,
                     "exec",
                     "--ephemeral",
+                    "--skip-git-repo-check",
                     "--sandbox",
                     "read-only",
                     "--output-last-message",
@@ -56,6 +58,7 @@ class CodexAnalyzer:
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
+                cwd=str(self.temp_dir),
             )
             if result.returncode != 0:
                 message = (result.stderr or "Codex retornou erro sem detalhes.").strip()

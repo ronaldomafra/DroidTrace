@@ -110,6 +110,19 @@ def test_validate_executable_reports_missing_command(monkeypatch):
         AdbClient("missing-adb").validate_executable()
 
 
+
+
+def test_stream_drops_oldest_lines_when_queue_is_full():
+    stream = AdbLogcatStream("adb", max_queue_lines=2)
+
+    stream._enqueue_line(stream.lines, "first")
+    stream._enqueue_line(stream.lines, "second")
+    stream._enqueue_line(stream.lines, "third")
+
+    assert stream.lines.get_nowait() == "second"
+    assert stream.lines.get_nowait() == "third"
+
+
 def test_package_pids_uses_adb_pidof_for_selected_device(monkeypatch):
     calls = []
 

@@ -29,9 +29,11 @@ def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monk
 
     assert result == "Resumo: erro de rede."
     args, kwargs = calls[0]
-    assert args[:4] == ["C:/npm/codex.CMD", "exec", "--ephemeral", "--sandbox"]
+    assert args[:3] == ["C:/npm/codex.CMD", "exec", "--ephemeral"]
+    assert "--skip-git-repo-check" in args
     assert "read-only" in args
     assert args[-1] == "-"
     assert "priorize erros de rede" in kwargs["input"]
     assert "Network: timeout" in kwargs["input"]
     assert kwargs["timeout"] == 120
+    assert kwargs["cwd"] == str(tmp_path)
