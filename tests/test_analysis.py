@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-from logcat_manager.analysis import CodexAnalyzer, format_analysis
-from logcat_manager.models import LogEntry
+from droidtrace.analysis import CodexAnalyzer, format_analysis
+from droidtrace.models import LogEntry
 
 
 def test_analyzer_sends_visible_logs_and_optional_prompt_to_codex(tmp_path, monkeypatch):

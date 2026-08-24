@@ -44,7 +44,7 @@ class FailingAnalyzer:
 
 @pytest.mark.asyncio
 async def test_prompt_remains_focused_after_filter_command():
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test() as pilot:
@@ -58,7 +58,7 @@ async def test_prompt_remains_focused_after_filter_command():
 async def test_slash_command_menu_is_visible_and_clickable():
     from textual.widgets import Input, OptionList
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test() as pilot:
@@ -83,7 +83,7 @@ async def test_slash_command_menu_is_visible_and_clickable():
 async def test_package_command_resolves_all_package_processes():
     from textual.widgets import Input
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test() as pilot:
@@ -98,7 +98,7 @@ async def test_package_command_resolves_all_package_processes():
 
 @pytest.mark.asyncio
 async def test_model_command_persists_and_updates_codex_analyzer(tmp_path):
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     analyzer = FakeAnalyzer()
     app = LogcatApp(stream=FakeStream(), analyzer=analyzer, config_path=tmp_path / "config.json", auto_start=False)
@@ -113,7 +113,7 @@ async def test_model_command_persists_and_updates_codex_analyzer(tmp_path):
 async def test_help_replaces_log_view_with_usage_reference():
     from textual.widgets import Input
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test() as pilot:
@@ -130,7 +130,7 @@ async def test_help_replaces_log_view_with_usage_reference():
 async def test_analise_sends_visible_logs_and_displays_codex_result():
     from textual.widgets import Input
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     analyzer = FakeAnalyzer()
     app = LogcatApp(stream=FakeStream(), analyzer=analyzer, auto_start=False)
@@ -163,7 +163,7 @@ async def test_analise_sends_visible_logs_and_displays_codex_result():
 async def test_analise_error_is_shown_in_log_view_without_error_toast():
     from textual.widgets import Input
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), analyzer=FailingAnalyzer(), auto_start=False)
     app.add_log_line("08-21 10:00:00.000  123  123 E Network: timeout")
@@ -179,7 +179,7 @@ async def test_analise_error_is_shown_in_log_view_without_error_toast():
 
 @pytest.mark.asyncio
 async def test_local_clear_works_without_confirmation():
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     app.add_log_line("08-21 10:12:13.123  1234  5678 E MyTag: boom")
@@ -191,7 +191,7 @@ async def test_local_clear_works_without_confirmation():
 
 @pytest.mark.asyncio
 async def test_rendering_a_log_line_does_not_raise():
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test():
@@ -203,7 +203,7 @@ async def test_rendering_a_log_line_does_not_raise():
 async def test_live_logs_append_without_repainting_the_entire_view():
     from textual.widgets import RichLog
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test():
@@ -218,7 +218,7 @@ async def test_manual_scroll_pauses_follow_then_resumes_after_idle():
     from textual import events
     from textual.widgets import RichLog
 
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     async with app.run_test():
@@ -233,7 +233,7 @@ async def test_manual_scroll_pauses_follow_then_resumes_after_idle():
 
 
 def test_drain_processes_only_one_bounded_batch_per_tick():
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     stream = FakeStream()
     for number in range(500):
@@ -247,7 +247,7 @@ def test_drain_processes_only_one_bounded_batch_per_tick():
 
 
 def test_render_window_is_bounded_to_keep_large_buffers_responsive():
-    from logcat_manager.app import LogcatApp
+    from droidtrace.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
     for number in range(10_000):

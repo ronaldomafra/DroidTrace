@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "logcat-manager"
+name = "droidtrace"
 version = "0.1.0"
-description = "Interactive colored Android logcat terminal viewer"
+description = "Interactive Android logcat viewer with Codex-powered analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["textual>=0.80"]
@@ -14,7 +14,7 @@ dependencies = ["textual>=0.80"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
-logcat-manager = "logcat_manager.__main__:main"
+droidtrace = "droidtrace.__main__:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

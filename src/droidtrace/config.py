@@ -20,7 +20,7 @@ class AppConfig:
 
 def default_config_path() -> Path:
     root = Path(os.environ.get("APPDATA", Path.home() / ".config"))
-    return root / "logcat-manager" / "config.json"
+    return root / "droidtrace" / "config.json"
 
 
 def load_config(path: Path | None = None) -> AppConfig:

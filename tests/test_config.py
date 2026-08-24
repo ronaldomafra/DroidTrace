@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from logcat_manager.config import AppConfig, load_config, resolve_adb_path, save_config
+from droidtrace.config import AppConfig, load_config, resolve_adb_path, save_config
 
 
 def test_cli_path_has_highest_precedence(monkeypatch):

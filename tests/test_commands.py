@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from logcat_manager.commands import Command, CommandError, parse_command
+from droidtrace.commands import Command, CommandError, parse_command
 
 
 @pytest.mark.parametrize(

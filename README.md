@@ -1,4 +1,4 @@
-# Logcat Manager
+# DroidTrace
 
 Aplicativo Python de terminal para acompanhar `adb logcat` em tempo real, com cores por prioridade, filtros locais, busca, regex, exportação e um prompt interativo sempre disponível na parte inferior da tela.
 
@@ -17,10 +17,11 @@ C:/Android/android-studio-sdk/platform-tools/adb.exe
 
 ## Instalação
 
-No Git Bash, abra o diretório do projeto:
+No Git Bash, clone e abra o projeto:
 
 ```bash
-cd C:/temp/prj_temp/logcat_manager
+git clone https://github.com/ronaldomafra/DroidTrace.git
+cd DroidTrace
 ```
 
 Crie o ambiente virtual e instale as dependências:
@@ -55,7 +56,7 @@ Se o estado for `unauthorized`, desbloqueie o celular e aceite a autorização d
 ### Forma recomendada: caminho e dispositivo explícitos
 
 ```bash
-.venv/Scripts/logcat-manager \
+.venv/Scripts/droidtrace \
   --adb-path "C:/Android/android-studio-sdk/platform-tools/adb.exe" \
   --serial RQ8M708HWEZ
 ```
@@ -63,7 +64,7 @@ Se o estado for `unauthorized`, desbloqueie o celular e aceite a autorização d
 ### Usar descoberta automática
 
 ```bash
-.venv/Scripts/logcat-manager
+.venv/Scripts/droidtrace
 ```
 
 O executável ADB é resolvido na seguinte ordem:
@@ -78,7 +79,7 @@ Exemplo com variável de ambiente na sessão atual do Git Bash:
 
 ```bash
 export ADB_PATH="C:/Android/android-studio-sdk/platform-tools/adb.exe"
-.venv/Scripts/logcat-manager --serial RQ8M708HWEZ
+.venv/Scripts/droidtrace --serial RQ8M708HWEZ
 ```
 
 ## Opções de linha de comando
@@ -95,7 +96,7 @@ export ADB_PATH="C:/Android/android-studio-sdk/platform-tools/adb.exe"
 Exemplo para manter até 50 mil linhas:
 
 ```bash
-.venv/Scripts/logcat-manager --max-buffer-lines 50000
+.venv/Scripts/droidtrace --max-buffer-lines 50000
 ```
 
 ## Interface interativa
@@ -177,7 +178,7 @@ Para voltar ao modelo padrão do Codex:
 Também é possível definir o modelo ao iniciar:
 
 ```bash
-.venv/Scripts/logcat-manager --codex-model gpt-5.4
+.venv/Scripts/droidtrace --codex-model gpt-5.4
 ```
 
 #### Histórico da sessão e retorno aos logs
@@ -266,7 +267,7 @@ A limpeza remota exige obrigatoriamente `confirm`. Não execute `:adb-clear conf
 Informe o caminho diretamente:
 
 ```bash
-.venv/Scripts/logcat-manager --adb-path "C:/Android/android-studio-sdk/platform-tools/adb.exe"
+.venv/Scripts/droidtrace --adb-path "C:/Android/android-studio-sdk/platform-tools/adb.exe"
 ```
 
 ### Nenhum dispositivo aparece
@@ -279,7 +280,7 @@ Liste os seriais e inicie com um serial explícito:
 
 ```bash
 "C:/Android/android-studio-sdk/platform-tools/adb.exe" devices
-.venv/Scripts/logcat-manager --serial emulator-5554
+.venv/Scripts/droidtrace --serial emulator-5554
 ```
 
 ### A tela não recebe novos logs

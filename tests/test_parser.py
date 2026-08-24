@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from logcat_manager.parser import parse_log_line, style_for_priority
+from droidtrace.parser import parse_log_line, style_for_priority
 
 
 def test_parser_extracts_threadtime_fields():

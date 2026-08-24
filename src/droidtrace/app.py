@@ -128,7 +128,7 @@ class LogcatApp(App[None]):
 
     def help_lines(self) -> list[str]:
         return [
-            "LOGCAT MANAGER — comandos",
+            "DROIDTRACE — comandos",
             "Digite / seguido do comando. Qualquer outro comando volta aos logs.",
             "",
             *[f"/{command:<10} {description}" for command, _, description in self.COMMANDS],

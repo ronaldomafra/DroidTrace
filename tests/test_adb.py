@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from logcat_manager.adb import AdbClient, AdbDevice, AdbLogcatStream
+from droidtrace.adb import AdbClient, AdbDevice, AdbLogcatStream
 
 
 class FakeProcess:
@@ -38,7 +38,7 @@ def test_list_devices_parses_only_device_rows(monkeypatch):
         assert kwargs["shell"] is False
         return SimpleNamespace(stdout="List of devices attached\nemulator-5554\tdevice\nABC\toffline\n\n")
 
-    monkeypatch.setattr("logcat_manager.adb.subprocess.run", fake_run)
+    monkeypatch.setattr("droidtrace.adb.subprocess.run", fake_run)
 
     assert AdbClient("adb").list_devices() == [AdbDevice("emulator-5554", "device"), AdbDevice("ABC", "offline")]
 
@@ -51,7 +51,7 @@ def test_start_stream_uses_threadtime_and_serial_without_shell(monkeypatch):
         calls.append((args, kwargs))
         return process
 
-    monkeypatch.setattr("logcat_manager.adb.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("droidtrace.adb.subprocess.Popen", fake_popen)
     stream = AdbLogcatStream("C:/sdk/adb.exe", serial="emulator-5554")
 
     stream.start()
@@ -62,7 +62,7 @@ def test_start_stream_uses_threadtime_and_serial_without_shell(monkeypatch):
 
 
 def test_stream_reader_enqueues_stdout_lines(monkeypatch):
-    monkeypatch.setattr("logcat_manager.adb.subprocess.Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr("droidtrace.adb.subprocess.Popen", lambda *args, **kwargs: FakeProcess())
     stream = AdbLogcatStream("adb")
 
     stream.start()
@@ -73,7 +73,7 @@ def test_stream_reader_enqueues_stdout_lines(monkeypatch):
 
 def test_stop_is_idempotent_and_restart_starts_new_process(monkeypatch):
     processes = [FakeProcess(()), FakeProcess(())]
-    monkeypatch.setattr("logcat_manager.adb.subprocess.Popen", lambda *args, **kwargs: processes.pop(0))
+    monkeypatch.setattr("droidtrace.adb.subprocess.Popen", lambda *args, **kwargs: processes.pop(0))
     stream = AdbLogcatStream("adb")
 
     stream.start()
@@ -94,7 +94,7 @@ def test_clear_logs_invokes_adb_logcat_clear_without_shell(monkeypatch):
         calls.append((args, kwargs))
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr("logcat_manager.adb.subprocess.run", fake_run)
+    monkeypatch.setattr("droidtrace.adb.subprocess.run", fake_run)
 
     AdbClient("adb", serial="ABC").clear_logs()
 
@@ -104,7 +104,7 @@ def test_clear_logs_invokes_adb_logcat_clear_without_shell(monkeypatch):
 
 
 def test_validate_executable_reports_missing_command(monkeypatch):
-    monkeypatch.setattr("logcat_manager.adb.shutil.which", lambda _: None)
+    monkeypatch.setattr("droidtrace.adb.shutil.which", lambda _: None)
 
     with pytest.raises(FileNotFoundError):
         AdbClient("missing-adb").validate_executable()
@@ -130,7 +130,7 @@ def test_package_pids_uses_adb_pidof_for_selected_device(monkeypatch):
         calls.append((args, kwargs))
         return SimpleNamespace(stdout="1234 5678\n")
 
-    monkeypatch.setattr("logcat_manager.adb.subprocess.run", fake_run)
+    monkeypatch.setattr("droidtrace.adb.subprocess.run", fake_run)
 
     assert AdbClient("adb", serial="ABC").package_pids("br.com.tbs.afv.multiplatform") == [1234, 5678]
     assert calls == [

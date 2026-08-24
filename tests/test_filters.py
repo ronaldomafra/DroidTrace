@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from logcat_manager.filters import LogBuffer, LogFilters
-from logcat_manager.models import LogEntry
+from droidtrace.filters import LogBuffer, LogFilters
+from droidtrace.models import LogEntry
 
 
 def entry(*, priority="I", tag="App", pid=10, message="message"):
@@ -39,8 +39,8 @@ def test_invalid_regex_returns_error_without_replacing_previous_regex():
 
 
 def test_package_pid_set_matches_every_process_of_the_package():
-    from logcat_manager.filters import LogFilters
-    from logcat_manager.models import LogEntry
+    from droidtrace.filters import LogFilters
+    from droidtrace.models import LogEntry
 
     filters = LogFilters(pids=frozenset({101, 202}))
     entries = [

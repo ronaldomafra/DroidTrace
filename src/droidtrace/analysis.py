@@ -60,7 +60,7 @@ class CodexAnalyzer:
     ) -> None:
         self.codex_executable = codex_executable
         self.runner = runner
-        self.temp_dir = temp_dir or Path(tempfile.gettempdir()) / "logcat-manager-codex"
+        self.temp_dir = temp_dir or Path(tempfile.gettempdir()) / "droidtrace-codex"
         self.timeout = timeout
         self.model = model
 
