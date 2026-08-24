@@ -21,7 +21,7 @@ from .sessions import Session, SessionRepository
 from .analysis import CodexAnalyzer, format_analysis
 from .config import AppConfig, default_config_path, save_config
 from .configurator import ConfigScreen
-from .providers import ProviderSettings
+from .providers import ProviderSettings, create_analyzer
 from .filters import LogBuffer, LogFilters
 from .parser import parse_log_line, style_for_priority
 
@@ -89,7 +89,7 @@ class LogcatApp(App[None]):
         self.config = config or AppConfig()
         self.config_path = config_path
         self.stream = stream
-        self.analyzer = analyzer or CodexAnalyzer(model=self.config.codex_model)
+        self.analyzer = analyzer or create_analyzer(ProviderSettings(self.config.provider, self.config.codex_model))
         self.auto_start = auto_start
         self.buffer = LogBuffer(self.config.max_buffer_lines)
         session_dir = Path(self.config.session_dir) if self.config.session_dir else default_config_path().parent / "sessions"
@@ -212,7 +212,7 @@ class LogcatApp(App[None]):
             session_dir=self.config.session_dir,
             recording_dir=self.config.recording_dir,
         )
-        self.analyzer.model = settings.model
+        self.analyzer = create_analyzer(settings)
         save_config(self.config, self.config_path)
         self.notify(f"Provider: {settings.provider} | modelo: {settings.model}")
 
