@@ -234,7 +234,7 @@ Por segurança, `:save` não sobrescreve um arquivo existente. Informe outro nom
 
 | Comando | Efeito |
 |---|---|
-| `:clear confirm` | Apaga somente o buffer local mostrado pelo aplicativo |
+| `:clear` | Apaga somente o buffer local mostrado pelo aplicativo |
 | `:adb-clear confirm` | Executa `adb logcat -c` e apaga o buffer de logs do dispositivo |
 
 A limpeza remota exige obrigatoriamente `confirm`. Não execute `:adb-clear confirm` se quiser preservar os logs atuais do dispositivo.

@@ -178,7 +178,7 @@ async def test_analise_error_is_shown_in_log_view_without_error_toast():
 
 
 @pytest.mark.asyncio
-async def test_local_clear_requires_confirm():
+async def test_local_clear_works_without_confirmation():
     from logcat_manager.app import LogcatApp
 
     app = LogcatApp(stream=FakeStream(), auto_start=False)
@@ -186,8 +186,6 @@ async def test_local_clear_requires_confirm():
     async with app.run_test() as pilot:
         await pilot.click("#command-input")
         await pilot.press(":", "c", "l", "e", "a", "r", "enter")
-        assert len(app.buffer) == 1
-        await pilot.press(":", "c", "l", "e", "a", "r", " ", "c", "o", "n", "f", "i", "r", "m", "enter")
         assert len(app.buffer) == 0
 
 

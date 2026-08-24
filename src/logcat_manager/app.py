@@ -54,7 +54,7 @@ class LogcatApp(App[None]):
         ("resume", "Continuar", "Retoma a atualização visual"),
         ("follow", "Ir ao fim", "Segue as linhas recentes"),
         ("save", "Exportar", "Uso: /save C:/logs/logcat.txt"),
-        ("clear", "Limpar tela", "Uso: /clear confirm"),
+        ("clear", "Limpar tela", "Limpa somente o buffer local"),
         ("adb-clear", "Limpar ADB", "Uso: /adb-clear confirm"),
         ("restart", "Reiniciar", "Reinicia a captura ADB"),
         ("quit", "Sair", "Fecha o aplicativo"),
@@ -443,8 +443,8 @@ class LogcatApp(App[None]):
                 self.notify(error, severity="error")
                 return
         elif name == "clear":
-            if argument != "confirm":
-                self.notify("Use :clear confirm para limpar somente o buffer local", severity="warning")
+            if argument not in {"", "confirm"}:
+                self.notify("Use /clear para limpar somente o buffer local", severity="warning")
                 return
             self.buffer.clear()
         elif name == "pause":
